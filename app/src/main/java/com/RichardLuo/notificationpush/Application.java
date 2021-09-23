@@ -1,6 +1,5 @@
 package com.RichardLuo.notificationpush;
 
-import android.animation.ValueAnimator;
 import android.app.SearchManager;
 import android.content.Context;
 import android.content.Intent;
@@ -8,14 +7,12 @@ import android.content.SharedPreferences;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
 import android.graphics.drawable.Drawable;
-import android.os.Build;
 import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
-import android.view.animation.Animation;
 import android.view.animation.AnimationUtils;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
@@ -25,7 +22,6 @@ import android.widget.ListView;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 
-import androidx.appcompat.app.ActionBar;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.AppCompatAutoCompleteTextView;
 import androidx.appcompat.widget.SearchView;
@@ -54,6 +50,7 @@ public class Application extends AppCompatActivity {
     List<ApplicationInfo> displayItem = new ArrayList<>();
     List<ApplicationInfo> tempItem;
     Info[] displayInfo;
+    Menu optionMenu;
 
     class ViewHolder {
         TextView text;
@@ -72,16 +69,15 @@ public class Application extends AppCompatActivity {
             icon = getPackageManager().getApplicationIcon(applicationInfo);
             selection = preferences.getInt(applicationInfo.packageName, preferences.contains("allOff") ? 2 : 0);
 
-            onItemClickListener = new AdapterView.OnItemClickListener() {
-                @Override
-                public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
-                    if (position == 0 && !preferences.contains("allOff")) {
-                        preferences.edit().remove(applicationInfo.packageName).apply();
-                        return;
-                    } else if (position == 2 && preferences.contains("allOff"))
-                        return;
-                    preferences.edit().putInt(applicationInfo.packageName, position).apply();
-                }
+            onItemClickListener = (parent, view, position, id) -> {
+                /*if (position == 0 && !preferences.contains("allOff")) {
+                    preferences.edit().remove(applicationInfo.packageName).apply();
+                    return;
+                } else if (position == 2 && preferences.contains("allOff")) {
+                    return;
+                }*/
+
+                preferences.edit().putInt(applicationInfo.packageName, position).apply();
             };
         }
     }
@@ -196,12 +192,7 @@ public class Application extends AppCompatActivity {
             }
         };
 
-        refreshListData(new Runnable() {
-            @Override
-            public void run() {
-                listView.setAdapter(ba);
-            }
-        });
+        refreshListData(() -> listView.setAdapter(ba));
     }
 
     public void refreshListData(final Runnable update) {
@@ -229,20 +220,35 @@ public class Application extends AppCompatActivity {
                     displayItem = packageInfo;
                 }
 
-                runOnUiThread(new Runnable() {
-                    @Override
-                    public void run() {
-                        update.run();
-                        progressBar.setVisibility(View.GONE);
-                    }
+                runOnUiThread(() -> {
+                    update.run();
+                    progressBar.setVisibility(View.GONE);
                 });
                 super.run();
             }
         }.start();
     }
 
+    public void setIsReverse(boolean isReverse) {
+        if (isReverse) {
+            preferences.edit().clear().putInt("allOff", 0).apply();
+        } else {
+            preferences.edit().remove("allOff").apply();
+        }
+        refreshReverseMenuItem();
+    }
+
+    public void refreshReverseMenuItem() {
+        if (preferences.contains("allOff")) {
+            optionMenu.findItem(R.id.reverse).setTitle(getString(R.string.positive));
+        } else {
+            optionMenu.findItem(R.id.reverse).setTitle(getString(R.string.reverse));
+        }
+    }
+
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
+        optionMenu = menu;
         getMenuInflater().inflate(R.menu.appmenu, menu);
 
         SearchManager searchManager = (SearchManager) getSystemService(Context.SEARCH_SERVICE);
@@ -266,8 +272,7 @@ public class Application extends AppCompatActivity {
         searchView.setSearchableInfo(Objects.requireNonNull(searchManager).getSearchableInfo(getComponentName()));
         searchView.setIconifiedByDefault(false);
 
-        if (preferences.contains("allOff"))
-            menu.findItem(R.id.reverse).setTitle(getString(R.string.positive));
+        refreshReverseMenuItem();
         return true;
     }
 
@@ -282,13 +287,7 @@ public class Application extends AppCompatActivity {
                 refreshListData(notifyDataSet);
                 break;
             case R.id.reverse:
-                if (!preferences.contains("allOff")) {
-                    preferences.edit().clear().putInt("allOff", 0).apply();
-                    item.setTitle(getString(R.string.positive));
-                } else {
-                    preferences.edit().remove("allOff").apply();
-                    item.setTitle(getString(R.string.reverse));
-                }
+                setIsReverse(!preferences.contains("allOff"));
                 refreshListData(notifyDataSet);
                 break;
         }

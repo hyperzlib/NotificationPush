@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">NotificationPush</string>
+    <string name="app_name">GCM Forwarding</string>
     <string name="service_name">GetNotification</string>
     <string name="access_name">ForegroundMonitor</string>
     <string name="descript_access">Hide notification when app is foreground</string>
@@ -45,4 +45,6 @@
     <string name="summary_ringForEach">Alert for every notice</string>
     <string name="search">search</string>
     <string name="positive">reset to normal</string>
+
+    <string name="xposed_description">Forwarding notification from other device.</string>
 </resources>

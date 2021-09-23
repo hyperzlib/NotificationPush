@@ -3,8 +3,11 @@ package com.RichardLuo.notificationpush;
 import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
+import android.app.PendingIntent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
+import android.graphics.drawable.Icon;
+import android.os.Build;
 import android.os.StrictMode;
 import android.service.notification.NotificationListenerService;
 import android.service.notification.StatusBarNotification;
@@ -66,8 +69,32 @@ public class GetNotification extends NotificationListenerService {
             public void run() {
                 String packageName = sbn.getPackageName();
                 Notification oneNotification = sbn.getNotification();
-                String title = oneNotification.extras.getString(Notification.EXTRA_TITLE, "无标题");
+                Object titleObj = oneNotification.extras.get(Notification.EXTRA_TITLE);
+                String title = "无标题";
+                if (titleObj != null) {
+                    title = titleObj.toString();
+                }
                 String body = oneNotification.extras.getCharSequence(Notification.EXTRA_TEXT, "无内容").toString();
+                String tickerText = null;
+                if (oneNotification.tickerText != null)
+                    tickerText = oneNotification.tickerText.toString();
+                String channelId = null;
+                if (Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                    channelId = oneNotification.getChannelId();
+                }
+                PendingIntent contentIntent = oneNotification.contentIntent;
+
+                String color = String.valueOf(oneNotification.color);
+                String group = oneNotification.getGroup();
+                String smallIcon = null;
+                // 获取小图标的资源id
+                if (Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.P) {
+                    smallIcon = packageName + ":" + oneNotification.icon;
+                } else {
+                    Icon iconData = oneNotification.getSmallIcon();
+                    smallIcon = iconData.getResPackage() + ":" + iconData.getResId();
+                }
+                // TODO: 上传大图标
                 String AppName;
                 SharedPreferences sharedPreferences = getSharedPreferences("AppName", MODE_PRIVATE);
                 if ((AppName = sharedPreferences.getString(packageName, null)) == null) {
@@ -109,7 +136,7 @@ public class GetNotification extends NotificationListenerService {
                     case "com.tencent.mobileqq":
                         if (!(title.contains("QQ空间"))) {
                             if (oneNotification.tickerText != null) {
-                                String tickerText = oneNotification.tickerText.toString().replace("\n", "");
+                                tickerText = oneNotification.tickerText.toString().replace("\n", "");
                                 Matcher matcher = Pattern.compile("^(.*?)\\((((?![()]).)*?)\\):(.*?)$").matcher(tickerText);
                                 if (matcher.find()) {
                                     senderName = matcher.group(1);
@@ -147,11 +174,18 @@ public class GetNotification extends NotificationListenerService {
                     JSONObject content = new JSONObject();
                     content.put("title", title);
                     content.put("body", body);
+                    content.put("ticker", tickerText);
                     content.put("package", packageName);
                     content.put("name", AppName);
                     content.put("id", ID);
+                    content.put("smallIcon", smallIcon);
+                    content.put("color", color);
                     if (senderName != null)
                         content.put("senderName", senderName);
+                    if (channelId != null)
+                        content.put("channelId", channelId);
+                    if (group != null)
+                        content.put("group", group);
                     obj.put("to", inputID);
                     obj.put("priority", priority);
                     obj.put("data", content);

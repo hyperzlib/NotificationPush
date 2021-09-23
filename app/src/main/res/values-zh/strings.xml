@@ -1,7 +1,7 @@
 <resources>
-    <string name="app_name">fcm通知转发</string>
-    <string name="service_name">GetNotification</string>
-    <string name="access_name">ForegroundMonitor</string>
+    <string name="app_name">GCM通知转发</string>
+    <string name="service_name">GCM通知转发 读取通知</string>
+    <string name="access_name">GCM通知转发 前台检测</string>
     <string name="descript_access">应用前台时隐藏通知</string>
     <string name="server">服务端</string>
     <string name="start">开始转发</string>
@@ -46,4 +46,6 @@
     <string name="summary_ringForEach">每一条通知都将会有提示音</string>
     <string name="search">搜索</string>
     <string name="positive">重置为正常优先级</string>
+
+    <string name="xposed_description">从其他设备转发通知</string>
 </resources>

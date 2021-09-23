@@ -5,6 +5,7 @@ import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.content.pm.ApplicationInfo;
+import android.content.pm.PackageManager;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.graphics.Bitmap;
@@ -14,8 +15,13 @@ import android.graphics.Paint;
 import android.graphics.PorterDuff;
 import android.graphics.PorterDuffXfermode;
 import android.graphics.Rect;
+import android.graphics.drawable.BitmapDrawable;
+import android.graphics.drawable.Drawable;
+import android.graphics.drawable.Icon;
 import android.os.Build;
+import android.os.Bundle;
 import android.service.notification.StatusBarNotification;
+import android.util.Log;
 
 import androidx.core.app.NotificationCompat;
 import androidx.core.app.NotificationManagerCompat;
@@ -36,6 +42,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+
+import de.robv.android.xposed.XposedHelpers;
 
 import static android.app.NotificationManager.IMPORTANCE_DEFAULT;
 import static android.app.PendingIntent.FLAG_UPDATE_CURRENT;
@@ -61,9 +69,47 @@ public class FCMReceiver extends FirebaseMessagingService {
         Map<String, String> data = remoteMessage.getData();
         String title = data.get("title");
         String body = data.get("body");
+        String ticker = data.get("ticker");
         String packageName = data.get("package");
         String AppName = data.get("name");
-        int id = Integer.valueOf(Objects.requireNonNull(data.get("id")));
+
+        String smallIconData = data.get("smallIcon");
+        Icon smallIcon = null;
+
+        ApplicationInfo appInfo = null;
+
+        try {
+            appInfo = getPackageManager().getApplicationInfo(packageName, 0);
+        } catch (PackageManager.NameNotFoundException ignored) { }
+
+        if (appInfo != null) { //存在相同app
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                if (smallIconData != null) {
+                    String[] splited = smallIconData.split(":");
+                    if (splited.length >= 2) {
+                        String smallIconPackage = splited[0];
+                        int smallIconResId = Integer.parseInt(splited[1]);
+                        Log.d("FCMReceiver", smallIconPackage);
+                        smallIcon = Icon.createWithResource(smallIconPackage, smallIconResId);
+                        Log.d("FCMReceiver", String.valueOf(smallIcon));
+                    }
+                } else {
+                    try {
+                        Drawable smallIconDrawable = getPackageManager().getApplicationIcon(packageName);
+                        smallIcon = Icon.createWithBitmap(((BitmapDrawable) smallIconDrawable).getBitmap());
+                    } catch (PackageManager.NameNotFoundException e) {
+                        Log.d("FCMReceiver", "Cannot find icon for package: " + packageName);
+                    } catch (Exception e) {
+                        Log.e("FCMReceiver", "Cannot get icon bitmap", e);
+                    }
+                }
+            }
+            if (data.containsKey("color")) {
+                color = Integer.parseInt(data.get("color"));
+            }
+        }
+
+        int id = Integer.parseInt(Objects.requireNonNull(data.get("id")));
         String senderName = null;
         if (data.containsKey("senderName"))
             senderName = data.get("senderName");
@@ -158,18 +204,56 @@ public class FCMReceiver extends FirebaseMessagingService {
                 setSummary(packageName, AppName, intent);
         }
 
-        Notification notification = new NotificationCompat.Builder(this, Objects.requireNonNull(AppName))
-                .setSmallIcon(R.drawable.ic_notification)
-                .setColor(color)
-                .setStyle(new NotificationCompat.BigTextStyle()
-                        .setSummaryText(AppName))
-                .setContentTitle(title)
-                .setContentText(body)
-                .setGroup(packageName)
-                .setContentIntent(intent)
-                .setAutoCancel(true)
-                .setOnlyAlertOnce(!ringForEach)
-                .build();
+        Notification notification;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            Notification.Builder builder;
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                builder = new Notification.Builder(this, Objects.requireNonNull(AppName));
+            } else {
+                builder = new Notification.Builder(this);
+            }
+
+            builder.setSmallIcon(R.drawable.ic_notification)
+                    .setColor(color)
+                    .setStyle(new Notification.BigTextStyle()
+                            .setSummaryText(AppName))
+                    .setContentTitle(title)
+                    .setContentText(body)
+                    .setGroup(packageName)
+                    .setContentIntent(intent)
+                    .setAutoCancel(true)
+                    .setOnlyAlertOnce(!ringForEach);
+
+            if (smallIcon != null)
+                builder.setSmallIcon(smallIcon);
+
+            if (ticker != null)
+                builder.setTicker(ticker);
+
+            Bundle extras = new Bundle();
+            if (data.containsKey("channelId")){
+                extras.putString("forward_channelId", data.get("channelId"));
+            }
+            if (data.containsKey("group")){
+                extras.putString("forward_group", data.get("group"));
+            }
+            builder.setExtras(extras);
+
+            notification = builder.build();
+        } else {
+            notification = new NotificationCompat.Builder(this, Objects.requireNonNull(AppName)).setSmallIcon(R.drawable.ic_notification)
+                    .setColor(color)
+                    .setStyle(new NotificationCompat.BigTextStyle()
+                            .setSummaryText(AppName))
+                    .setContentTitle(title)
+                    .setContentText(body)
+                    .setGroup(packageName)
+                    .setContentIntent(intent)
+                    .setAutoCancel(true)
+                    .setOnlyAlertOnce(!ringForEach)
+                    .build();
+        }
+
         notificationManagerCompat.notify(packageName, id, notification);
     }
 
@@ -233,7 +317,7 @@ public class FCMReceiver extends FirebaseMessagingService {
             intent = Package_Intent.get(packageName);
             return intent;
         }
-        if (packageName != null && !packageName.contains("android") && packageName.split("\\.", 2)[0].equals("com") && isAppInstalled(packageName))
+        if (packageName != null && !packageName.contains("android") && isAppInstalled(packageName))
             try {
                 intent = PendingIntent.getActivity(this, 200, getPackageManager().getLaunchIntentForPackage(packageName), FLAG_UPDATE_CURRENT);
             } catch (Exception e) {
