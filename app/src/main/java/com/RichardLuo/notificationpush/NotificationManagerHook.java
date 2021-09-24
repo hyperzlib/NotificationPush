@@ -90,8 +90,6 @@ public class NotificationManagerHook implements IXposedHookZygoteInit, IXposedHo
                     @Override
                     protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
                         try {
-                            Binder.clearCallingIdentity(); // 屏蔽权限管理
-
                             String pkg = (String) param.args[0];
                             String opPkg = (String) param.args[1];
                             int callingUid = (Integer) param.args[2];
@@ -103,6 +101,7 @@ public class NotificationManagerHook implements IXposedHookZygoteInit, IXposedHo
                             boolean postSilently = (Boolean) param.args[8];
                             // Log.d(TAG, "currentPackageName: " + currentPackageName + ", pkg: " + pkg + ", opPkg: " + pkg);
                             if (currentPackageName.equals(opPkg)) {
+                                Binder.clearCallingIdentity(); // 屏蔽权限管理
                                 // 是转发的消息，尝试更改发送方
                                 String packageName = notification.getGroup();
                                 int uid = getUid(packageName);
